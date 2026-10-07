@@ -1,4 +1,4 @@
-name: CI
+name: BLUFF CI
 
 on:
   push:
@@ -7,24 +7,40 @@ on:
     branches: [main]
 
 jobs:
-  lint-contracts:
-    name: Lint Contracts
+  lint:
+    name: Lint BLUFF Contract
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install -r requirements.txt
-      - run: genvm-lint check contracts/football_bets.py
 
-  test-direct:
-    name: Direct Mode Tests
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r requirements.txt
-      - run: pytest tests/direct/ -v
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint BLUFF
+        run: genvm-lint contracts/bluff.py
+
+  test:
+    name: Test BLUFF Contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run BLUFF direct tests
+        run: python -m pytest tests/direct/test_bluff.py -q
