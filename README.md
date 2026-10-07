@@ -1,143 +1,419 @@
-# Sample GenLayer project
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit/)
-[![Discord](https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/8Jm4v89VAu)
-[![Telegram](https://img.shields.io/badge/Telegram--T.svg?style=social&logo=telegram)](https://t.me/genlayer)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/yeagerai.svg?style=social&label=Follow%20%40GenLayer)](https://x.com/GenLayer)
-[![GitHub star chart](https://img.shields.io/github/stars/yeagerai/genlayer-project-boilerplate?style=social)](https://star-history.com/#yeagerai/genlayer-js)
+# BLUFF
 
-## About
-This project includes the boilerplate code for a GenLayer use case implementation, specifically a football bets game.
+**AI-adjudicated claims with decentralized consensus on GenLayer.**
 
-## What's included
-- An example intelligent contract (Football Bets) with web access and LLM integration
-- **Direct mode tests** — fast, in-memory unit tests with web/LLM mocking (~ms per test)
-- **Integration tests** — full end-to-end tests against GenLayer Studio
-- **Contract linting** — static analysis to catch common contract issues before deployment
-- **CI pipeline** — GitHub Actions workflow for linting and direct tests
-- A production-ready Next.js 15 frontend with TypeScript, TanStack Query, and Radix UI
-- Configuration file template and deployment scripts
+BLUFF is a reusable Intelligent Contract for games and applications where a participant makes a subjective claim, another participant challenges it, and GenLayer validators determine whether the claim is valid under explicit scenario rules.
 
-## Requirements
-- Python >= 3.12
-- [GenLayer CLI](https://github.com/genlayerlabs/genlayer-cli) globally installed: `npm install -g genlayer`
-- GenLayer Studio (for integration tests and deployment): Install from [Docs](https://docs.genlayer.com/developers/intelligent-contracts/tooling-setup#using-the-genlayer-studio) or use the hosted [GenLayer Studio](https://studio.genlayer.com/)
+Instead of trusting a game server, administrator, or single AI model, BLUFF turns subjective rule enforcement into a consensus-backed state transition.
+
+## Core Idea
+
+Traditional smart contracts work well when correctness can be expressed deterministically.
+
+But many games and applications contain questions such as:
+
+> "Is this action actually possible under the rules?"
+
+Those questions may require semantic reasoning rather than simple arithmetic or fixed conditions.
+
+BLUFF provides the following lifecycle:
+
+```text
+Create Game
+    ↓
+Submit Claim
+    ↓
+Challenge Claim
+    ↓
+GenLayer AI Adjudication
+    ↓
+Validator Consensus
+    ↓
+VALID / INVALID
+    ↓
+Resolved State
+```
+
+The scenario and rules define the adjudication boundary. A claimant cannot simply invent capabilities, objects, permissions, or facts that do not exist in that environment.
+
+## Why GenLayer?
+
+BLUFF needs more than a conventional deterministic smart contract.
+
+A claim may be grammatically different while expressing the same action, and determining whether that action is plausible can require contextual reasoning.
+
+GenLayer allows BLUFF to use nondeterministic AI inference inside an Intelligent Contract while validators establish consensus over the result.
+
+The contract therefore combines:
+
+- deterministic game state
+- explicit rules
+- AI reasoning
+- GenLayer validator consensus
+- persistent consensus-backed outcomes
+
+## Contract Lifecycle
+
+A BLUFF game moves through four states:
+
+```text
+OPEN
+  ↓
+CLAIMED
+  ↓
+CHALLENGED
+  ↓
+RESOLVED
+```
+
+### 1. Create
+
+A creator provides:
+
+- unique game ID
+- scenario
+- explicit rules
+
+The game enters `OPEN`.
+
+### 2. Claim
+
+A player submits an action or claim.
+
+The game enters `CLAIMED`.
+
+### 3. Challenge
+
+Another address challenges the claim.
+
+The claimant cannot challenge their own claim.
+
+The game enters `CHALLENGED`.
+
+### 4. Resolve
+
+`resolve_game` asks GenLayer validators to adjudicate the claim against the scenario and rules.
+
+The canonical consensus result is:
+
+```text
+VALID
+```
+
+or:
+
+```text
+INVALID
+```
+
+After consensus, the game enters `RESOLVED`.
+
+## Adjudication Rules
+
+A claim is considered `VALID` only when it:
+
+1. obeys every explicit rule;
+2. is reasonably possible within the scenario;
+3. does not invent essential objects, powers, facts, permissions, or capabilities that are not provided by the scenario; and
+4. plausibly achieves what the player claims.
+
+Otherwise the claim is `INVALID`.
+
+## Consensus Design
+
+An important design principle in BLUFF is keeping the value used for validator equality small and canonical.
+
+The AI adjudicator returns only:
+
+```json
+{
+  "verdict": "VALID"
+}
+```
+
+or:
+
+```json
+{
+  "verdict": "INVALID"
+}
+```
+
+The value passed through GenLayer's strict equality principle is therefore only the normalized verdict:
+
+```text
+VALID | INVALID
+```
+
+Human-readable reasoning is generated deterministically after consensus.
+
+This avoids requiring validators to produce identical free-form natural-language explanations in order to agree on the same semantic decision.
+
+## V1 → V2 Consensus Improvement
+
+An earlier implementation returned both the verdict and free-form AI reasoning inside the value evaluated by strict equality.
+
+Different validators could agree that a claim was invalid while expressing their reasoning differently. That unnecessarily enlarged the nondeterministic consensus surface and could result in an `UNDETERMINED` transaction.
+
+V2 changed the architecture:
+
+```text
+V1
+
+AI
+ ↓
+{ verdict, free-form reasoning }
+ ↓
+strict_eq
+```
+
+became:
+
+```text
+V2
+
+AI
+ ↓
+canonical verdict
+ ↓
+strict_eq
+ ↓
+deterministic explanation
+```
+
+The V2 design was subsequently validated through a complete live GenLayer lifecycle.
+
+## Live Deployment
+
+BLUFF V2 is deployed on **GenLayer Studio Devnet**.
+
+```text
+Contract
+0x4f044fe38ac4d5E01CaCcB70Cd81069BDb94b070
+```
+
+Chain ID:
+
+```text
+61997
+```
+
+## Verified Live Example
+
+Game:
+
+```text
+submission-demo-v2-001
+```
+
+Scenario:
+
+> You are locked inside a room. The room contains a wooden table, a chair, a locked door, and a key lying on the table.
+
+Rules:
+
+> You may use only objects explicitly present in the room. You cannot break the door or invent additional tools.
+
+Submitted claim:
+
+> I use a crowbar to force open the locked door.
+
+The crowbar does not exist in the scenario and the rules explicitly prohibit inventing additional tools.
+
+The claim was challenged and submitted to GenLayer adjudication.
+
+Final persisted state:
+
+```text
+status:    RESOLVED
+verdict:   INVALID
+reasoning: Claim rejected by GenLayer validator consensus.
+```
+
+Resolution transaction:
+
+```text
+0xd674fc382bc78e7896200a46d51942468e217b971593f9feac95cb599b05dd25
+```
+
+Consensus result:
+
+```text
+MAJORITY_AGREE
+ACCEPTED
+```
+
+This demonstrates the complete lifecycle:
+
+```text
+CREATE
+  ↓
+CLAIM
+  ↓
+CHALLENGE
+  ↓
+AI ADJUDICATION
+  ↓
+GENLAYER CONSENSUS
+  ↓
+INVALID
+  ↓
+RESOLVED
+```
+
+## Intelligent Contract
+
+The production contract is:
+
+```text
+contracts/bluff.py
+```
+
+### Write Methods
+
+#### `create_game`
+
+Creates a new scenario and rule set.
+
+#### `submit_claim`
+
+Submits a player's claim to an open game.
+
+#### `challenge_claim`
+
+Challenges an existing claim.
+
+#### `resolve_game`
+
+Runs GenLayer AI adjudication and resolves the challenged game through validator consensus.
+
+### Read Methods
+
+#### `get_game`
+
+Returns a specific game's complete state.
+
+#### `get_games`
+
+Returns stored games.
 
 ## Project Structure
 
-```
-contracts/              # Python intelligent contracts
+```text
+contracts/
+  bluff.py                 # BLUFF V2 Intelligent Contract
+
 tests/
-  direct/               # Fast in-memory tests (no Studio required)
-    test_create_bet.py   # Bet creation logic
-    test_resolve_bet.py  # Bet resolution with web/LLM mocks
-    test_views.py        # Read-only view methods
-  integration/           # Full tests against GenLayer Studio
-    test_football_bets.py
-    fixtures.py          # Expected state fixtures
-frontend/               # Next.js 15 app (TypeScript, TanStack Query, Radix UI)
-deploy/                 # TypeScript deployment scripts
-gltest.config.yaml      # Test runner network configuration
-pyproject.toml          # Python/pytest configuration
-.github/workflows/      # CI pipeline
+  direct/
+    test_bluff.py          # BLUFF direct-mode tests
+    conftest.py            # GenVM v0.6 test compatibility setup
+
+gltest.config.yaml
+pyproject.toml
+requirements.txt
+README.md
+LICENSE
 ```
 
-## Quick Start
+The repository originates from the GenLayer project boilerplate, so additional boilerplate examples and tooling may also remain in the repository.
 
-### 1. Set up Python environment
+## Requirements
 
-```shell
+- Python 3.12+
+- GenLayer CLI
+- GenLayer test tooling
+- GenVM linter
+
+Create a Python environment:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Lint your contracts
+## Testing
 
-Run the GenVM linter to catch issues before deployment:
+BLUFF includes direct-mode contract tests.
 
-```shell
-genvm-lint check contracts/football_bets.py
+Run:
+
+```bash
+.venv/bin/python -m pytest tests/direct/test_bluff.py -q
 ```
 
-The linter catches:
-- Forbidden imports and non-deterministic calls
-- Invalid storage types (must use `TreeMap`, `DynArray`, `u256`, etc.)
-- Missing decorators and return type annotations
-- Non-deterministic operations outside equivalence principle blocks
-- And [20+ other rules](https://github.com/genlayerlabs/genvm-linter)
+Current verified result:
 
-### 3. Run direct mode tests
-
-Direct mode tests run contracts in-memory without needing GenLayer Studio. They use mocks for web requests and LLM calls, giving you fast feedback (~milliseconds per test):
-
-```shell
-pytest tests/direct/ -v
+```text
+8 passed
 ```
 
-Direct mode features used in these tests:
-- `direct_deploy("contracts/file.py")` — deploy contract in memory
-- `direct_vm.sender = address` — set transaction sender
-- `direct_vm.mock_web(pattern, response)` — mock HTTP/render calls
-- `direct_vm.mock_llm(pattern, response)` — mock LLM responses
-- `direct_vm.expect_revert("message")` — assert expected failures
-- `direct_vm.clear_mocks()` — reset mocks between calls
+The tests cover the core contract lifecycle and validation behavior.
 
-### 4. Deploy the contract
+## Linting
 
-1. Choose your network: `genlayer network`
-2. Deploy: `genlayer deploy` (runs the script in `/deploy/deployScript.ts`)
+Run:
 
-### 5. Run integration tests
-
-Integration tests deploy the contract to GenLayer Studio and test with real consensus:
-
-```shell
-gltest tests/integration/ -v -s
+```bash
+.venv/bin/genvm-lint contracts/bluff.py
 ```
 
-These require GenLayer Studio running (local or hosted).
+Current verified result:
 
-### 6. Set up the frontend
-
-1. Copy `frontend/.env.example` to `frontend/.env`
-2. Add your deployed contract address as `NEXT_PUBLIC_CONTRACT_ADDRESS`
-3. Run:
-
-```shell
-cd frontend
-npm install
-npm run dev
+```text
+Lint passed (3 checks)
 ```
 
-The app will be available at http://localhost:3000/.
+## Reading the Deployed Game
 
-## How the Football Bets Contract Works
+Using the GenLayer CLI:
 
-1. **Creating Bets**: Users bet on a football match by providing the game date, teams, and predicted winner.
-2. **Resolving Bets**: After the match, the contract fetches results from BBC Sport, uses an LLM to extract the score, and validates via the equivalence principle.
-3. **Points**: Correct predictions earn points. Users can query their points or the leaderboard.
+```bash
+genlayer call \
+  0x4f044fe38ac4d5E01CaCcB70Cd81069BDb94b070 \
+  get_game \
+  --args "submission-demo-v2-001"
+```
 
-## Testing Strategy
+The verified deployed game returns:
 
-| Test Type | Command | Speed | Requires Studio |
-|-----------|---------|-------|-----------------|
-| **Lint** | `genvm-lint check contracts/*.py` | ~250ms | No |
-| **Direct** | `pytest tests/direct/ -v` | ~ms/test | No |
-| **Integration** | `gltest tests/integration/ -v -s` | ~min/test | Yes |
+```text
+status: RESOLVED
+verdict: INVALID
+reasoning: Claim rejected by GenLayer validator consensus.
+```
 
-**Recommended workflow:**
-1. Lint after every contract change
-2. Run direct tests frequently during development
-3. Run integration tests before deployment to verify consensus behavior
+## What BLUFF Demonstrates
 
-For AI coding agents (Claude Code, Cursor, etc.), the linter and direct tests provide the fast feedback loop needed for iterative development without requiring a running Studio instance.
+BLUFF is intentionally small at the contract layer.
 
-## Community
-- **[Discord](https://discord.gg/8Jm4v89VAu)**: Discussions, support, and announcements
-- **[Telegram](https://t.me/genlayer)**: Informal chats and quick updates
+Its purpose is not to encode one particular game. It demonstrates a reusable adjudication primitive:
 
-## Documentation
-For detailed information, see our [documentation](https://docs.genlayer.com/).
+```text
+Scenario
++ Rules
++ Claim
++ Challenge
++ AI Reasoning
++ Validator Consensus
+= Verified Outcome
+```
+
+That primitive can be extended to bluffing games, strategy games, role-playing environments, disputes, simulations, agent interactions, and other applications where correctness depends on contextual reasoning.
+
+## Status
+
+- Intelligent Contract implemented
+- GenVM lint passing
+- 8 direct tests passing
+- deployed to GenLayer Studio Devnet
+- live create flow verified
+- live claim flow verified
+- live challenge flow verified
+- live AI adjudication verified
+- validator consensus verified
+- persisted `RESOLVED / INVALID` state verified
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+MIT. See [LICENSE](LICENSE).
